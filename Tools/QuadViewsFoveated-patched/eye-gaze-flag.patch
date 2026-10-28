@@ -1,0 +1,56 @@
+﻿diff --git a/openxr-api-layer/layer.cpp b/openxr-api-layer/layer.cpp
+index 981704d..28c3731 100644
+--- a/openxr-api-layer/layer.cpp
++++ b/openxr-api-layer/layer.cpp
+@@ -247,6 +247,14 @@ namespace openxr_api_layer {
+                         } else if (eyeGazeInteractionProperties.supportsEyeGazeInteraction) {
+                             // Prefer the eye gaze interaction extension over the social eye tracking extension.
+                             m_trackerType = Tracker::EyeGazeInteraction;
++                        } else if (std::find(GetGrantedExtensions().cbegin(),
++                                             GetGrantedExtensions().cend(),
++                                             XR_EXT_EYE_GAZE_INTERACTION_EXTENSION_NAME) !=
++                                   GetGrantedExtensions().cend()) {
++                            // Patch: Vive Pro Eye API layers (VIVE OpenXR Facial Tracking, DragonDreams VIVE SDK) grant
++                            // XR_EXT_eye_gaze_interaction but never set supportsEyeGazeInteraction through SteamVR.
++                            Log("Eye gaze interaction extension granted but not reported as supported; using it anyway\n");
++                            m_trackerType = Tracker::EyeGazeInteraction;
+                         } else if (eyeTrackingProperties.supportsEyeTracking) {
+                             // Last resort if the "social eye tracking".
+                             m_trackerType = Tracker::EyeTrackerFB;
+@@ -2099,6 +2107,14 @@ namespace openxr_api_layer {
+ 
+                 unitVector = Normalize(
+                     {gazeProjectedPoint.m128_f32[0], gazeProjectedPoint.m128_f32[1], gazeProjectedPoint.m128_f32[2]});
++
++                // Patch: some eye tracker layers (DragonDreams VIVE SDK on Vive Pro Eye) report a flipped axis.
++                if (m_invertEyeGazeX) {
++                    unitVector.x = -unitVector.x;
++                }
++                if (m_invertEyeGazeY) {
++                    unitVector.y = -unitVector.y;
++                }
+             }
+ 
+             return true;
+@@ -2919,6 +2935,12 @@ namespace openxr_api_layer {
+                     } else if (name == "debug_eye_gaze") {
+                         m_debugEyeGaze = std::stoi(value);
+                         parsed = true;
++                    } else if (name == "invert_eye_gaze_x") {
++                        m_invertEyeGazeX = std::stoi(value);
++                        parsed = true;
++                    } else if (name == "invert_eye_gaze_y") {
++                        m_invertEyeGazeY = std::stoi(value);
++                        parsed = true;
+                     } else if (name == "debug_keys") {
+                         m_debugKeys = std::stoi(value);
+                         parsed = true;
+@@ -3052,6 +3074,8 @@ namespace openxr_api_layer {
+ 
+         bool m_debugFocusView{false};
+         bool m_debugEyeGaze{false};
++        bool m_invertEyeGazeX{false};
++        bool m_invertEyeGazeY{false};
+         bool m_debugSimulateTracking{false};
+         bool m_debugKeys{false};
+ 
